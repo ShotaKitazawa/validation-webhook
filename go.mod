@@ -1,4 +1,4 @@
-module github.com/ShotaKitazawa/admission-webhook-demo
+module github.com/ShotaKitazawa/validation-webhook
 
 go 1.13
 

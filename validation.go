@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	admission "k8s.io/api/admission/v1"
+	ingress "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
@@ -27,14 +28,21 @@ func (e *Immutable) Error() string {
 }
 
 func Validation(ar *admission.AdmissionReview) (violate error, err error) {
-	if violate = validationImmutable(ar); violate != nil {
-		return violate, nil
+	// Immutable Check
+	var object, oldObject ingress.Ingress
+	if err := json.Unmarshal(ar.Request.Object.Raw, &object); err != nil {
+		return nil, err
 	}
-	return nil, nil
-}
+	if err := json.Unmarshal(ar.Request.OldObject.Raw, &oldObject); err != nil {
+		return nil, err
+	}
+	provideGIP := object.Annotations["kubernetes.io/ingress.global-static-ip-name"]
+	currentGIP := oldObject.Annotations["kubernetes.io/ingress.global-static-ip-name"]
+	if currentGIP != "" && provideGIP == currentGIP {
+		return &Immutable{Field: "Ingress.metadata.annotations['kubernetes.io/ingress.global-static-ip-name']"}, nil
+	}
 
-func validationImmutable(ar *admission.AdmissionReview) error {
-	return &Immutable{}
+	return nil, nil
 }
 
 func jsonPatch(ar *admission.AdmissionReview, violate error) ([]byte, error) {
@@ -56,6 +64,7 @@ func jsonPatch(ar *admission.AdmissionReview, violate error) ([]byte, error) {
   }
 }
 `, apiVersion, ar.Request.UID, 400, customErr.Error())
+
 	default:
 		respStr = fmt.Sprintf(`
 {
