@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	admission "k8s.io/api/admission/v1beta1"
-	ingress "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
@@ -38,21 +38,89 @@ func (e *Immutable) Error() string {
 
 func Validation(ar *admission.AdmissionReview) (violate error, err error) {
 	// Immutable Check
-	var object, oldObject ingress.Ingress
+	var object, oldObject map[string]interface{}
 	if err := json.Unmarshal(ar.Request.Object.Raw, &object); err != nil {
 		return nil, err
 	}
 	if err := json.Unmarshal(ar.Request.OldObject.Raw, &oldObject); err != nil {
-		fmt.Println("hoge")
 		return nil, err
 	}
-	provideGIP := object.Annotations["kubernetes.io/ingress.global-static-ip-name"]
-	currentGIP := oldObject.Annotations["kubernetes.io/ingress.global-static-ip-name"]
+
+	path := `ingress.metadata.annotations["kubernetes.io/ingress.global-static-ip-name"]`
+	escapedPath, err := escape(path)
+	if err != nil {
+		return nil, nil
+	}
+	provideGIP, err := search(object, escapedPath)
+	if err != nil {
+		return nil, nil
+	}
+	currentGIP, err := search(oldObject, escapedPath)
+	if err != nil {
+		return nil, nil
+	}
+
 	if currentGIP != "" && provideGIP != currentGIP {
-		return &Immutable{Field: "Ingress.metadata.annotations['kubernetes.io/ingress.global-static-ip-name']"}, nil
+		return &Immutable{Field: `Ingress.metadata.annotations["kubernetes.io/ingress.global-static-ip-name"]`}, nil
 	}
 
 	return nil, nil
+}
+
+func escape(str string) (string, error) {
+	head := strings.Index(str, "[")
+	tail := strings.Index(str, "]")
+
+	// search end
+	if head < 0 && tail < 0 {
+		return str, nil
+	}
+	// invalid
+	if head < 0 || tail < 0 {
+		return "", fmt.Errorf("invalid syntax")
+	}
+	a := str[:head]
+	c, err := escape(str[tail+1:])
+	if err != nil {
+		return "", err
+	}
+	b := strings.ReplaceAll(strings.ReplaceAll(str[head+1:tail], ".", "&pe"), "\"", "")
+	if c == "" {
+		return a + "." + b, nil
+	} else {
+		return a + "." + b + "." + c, nil
+	}
+
+}
+func unescape(str string) string {
+	return strings.ReplaceAll(str, "&pe", ".")
+}
+
+func search(obj map[string]interface{}, path string) (interface{}, error) {
+	topField := strings.Split(path, ".")[0]
+	if strings.ToLower(obj["kind"].(string)) != strings.ToLower(topField) {
+		return nil, fmt.Errorf("no much kind")
+	}
+	return recursiveSearch(obj, path[strings.Index(path, ".")+1:])
+}
+
+func recursiveSearch(obj map[string]interface{}, path string) (interface{}, error) {
+	topField := strings.Split(path, ".")[0]
+	if path != topField {
+		newObj, ok := obj[unescape(topField)]
+		if !ok {
+			return nil, fmt.Errorf("no much field")
+		}
+		newObjMAP, ok := newObj.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("this field is not map")
+		}
+		return recursiveSearch(newObjMAP, path[strings.Index(path, ".")+1:])
+	}
+	if _, ok := obj[unescape(topField)]; !ok {
+		return nil, fmt.Errorf("no much field")
+	}
+	return obj[unescape(topField)], nil
 }
 
 func jsonPatch(ar *admission.AdmissionReview, violate error) (map[string]interface{}, error) {
@@ -73,7 +141,7 @@ func jsonPatch(ar *admission.AdmissionReview, violate error) (map[string]interfa
     }
   }
 }
-`, apiVersion, ar.Request.UID, 400, customErr.Error())
+`, apiVersion, ar.Request.UID, 400, strings.ReplaceAll(customErr.Error(), `"`, `\"`))
 
 	default:
 		respStr = fmt.Sprintf(`
