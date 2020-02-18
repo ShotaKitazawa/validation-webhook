@@ -66,6 +66,11 @@ func validation(ar *admission.AdmissionReview) (violate error, err error) {
 	return nil, nil
 }
 
+func getUID(ar *admission.AdmissionReview) (uid string, err error) {
+	uid = string(ar.Request.UID)
+	return
+}
+
 func Handler(c echo.Context) error {
 	r := c.Request()
 	if r.Body == nil {
@@ -86,7 +91,7 @@ func Handler(c echo.Context) error {
 		return c.String(http.StatusBadRequest, err.Error()) // 400
 	}
 
-	resp, err := jsonpatch.JsonPatch(ar, violate)
+	resp, err := jsonpatch.JsonPatch(string(ar.Request.UID), violate)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, err.Error()) // 500
 	}

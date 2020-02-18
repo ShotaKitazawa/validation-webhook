@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	admission "k8s.io/api/admission/v1beta1"
-
 	"github.com/ShotaKitazawa/validation-webhook/pkg/errors"
 )
 
@@ -14,7 +12,7 @@ const (
 	apiVersion = "admission.k8s.io/v1beta1"
 )
 
-func JsonPatch(ar *admission.AdmissionReview, violate error) (map[string]interface{}, error) {
+func JsonPatch(uid string, violate error) (map[string]interface{}, error) {
 	var respStr string
 
 	switch customErr := violate.(type) {
@@ -32,7 +30,7 @@ func JsonPatch(ar *admission.AdmissionReview, violate error) (map[string]interfa
     }
   }
 }
-`, apiVersion, ar.Request.UID, 400, strings.ReplaceAll(customErr.Error(), `"`, `\"`))
+`, apiVersion, uid, 400, strings.ReplaceAll(customErr.Error(), `"`, `\"`))
 
 	default:
 		respStr = fmt.Sprintf(`
@@ -44,7 +42,7 @@ func JsonPatch(ar *admission.AdmissionReview, violate error) (map[string]interfa
     "allowed": true
   }
 }
-`, apiVersion, ar.Request.UID)
+`, apiVersion, uid)
 	}
 
 	var jsonBody map[string]interface{}
