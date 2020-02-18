@@ -45,22 +45,26 @@ func validation(ar *admission.AdmissionReview) (violate error, err error) {
 		return nil, err
 	}
 
+	// TODO: read from config_file
 	path := `ingress.metadata.annotations["kubernetes.io/ingress.global-static-ip-name"]`
+
+	// TODO: evaluate multiple `path`
+	// TODO: concurrency evaluate
 	escapedPath, err := search.Escape(path)
 	if err != nil {
 		return nil, nil
 	}
-	provideGIP, err := search.Search(object, escapedPath)
+	provide, err := search.Search(object, escapedPath)
 	if err != nil {
 		return nil, nil
 	}
-	currentGIP, err := search.Search(oldObject, escapedPath)
+	current, err := search.Search(oldObject, escapedPath)
 	if err != nil {
 		return nil, nil
 	}
 
-	if currentGIP != "" && provideGIP != currentGIP {
-		return &errors.Immutable{Field: `Ingress.metadata.annotations["kubernetes.io/ingress.global-static-ip-name"]`}, nil
+	if current != "" && provide != current {
+		return &errors.Immutable{Field: path}, nil
 	}
 
 	return nil, nil
