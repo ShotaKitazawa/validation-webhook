@@ -9,6 +9,9 @@ require (
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/golang/dep v0.5.4 // indirect
 	github.com/jmank88/nuts v0.4.0 // indirect
+	github.com/labstack/echo/v4 v4.1.14
+	github.com/motemen/go-loghttp v0.0.0-20170804080138-974ac5ceac27
+	github.com/motemen/go-nuts v0.0.0-20190725124253-1d2432db96b0 // indirect
 	github.com/nightlyone/lockfile v0.0.0-20200124072040-edb130adc195 // indirect
 	github.com/pelletier/go-toml v1.6.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

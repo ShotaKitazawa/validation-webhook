@@ -4,20 +4,29 @@ import (
 	"encoding/json"
 	"fmt"
 
-	admission "k8s.io/api/admission/v1"
+	admission "k8s.io/api/admission/v1beta1"
 	ingress "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
 const (
-	apiVersion = "admission.k8s.io/v1"
+	apiVersion = "admission.k8s.io/v1beta1"
 )
 
 var (
 	scheme = runtime.NewScheme()
 	codecs = serializer.NewCodecFactory(scheme)
 )
+
+func newAdmissionReview(body []byte) (*admission.AdmissionReview, error) {
+	ar := admission.AdmissionReview{}
+	deserializer := codecs.UniversalDeserializer()
+	if _, _, err := deserializer.Decode(body, nil, &ar); err != nil {
+		return nil, err
+	}
+	return &ar, nil
+}
 
 type Immutable struct {
 	Field string
@@ -34,18 +43,19 @@ func Validation(ar *admission.AdmissionReview) (violate error, err error) {
 		return nil, err
 	}
 	if err := json.Unmarshal(ar.Request.OldObject.Raw, &oldObject); err != nil {
+		fmt.Println("hoge")
 		return nil, err
 	}
 	provideGIP := object.Annotations["kubernetes.io/ingress.global-static-ip-name"]
 	currentGIP := oldObject.Annotations["kubernetes.io/ingress.global-static-ip-name"]
-	if currentGIP != "" && provideGIP == currentGIP {
+	if currentGIP != "" && provideGIP != currentGIP {
 		return &Immutable{Field: "Ingress.metadata.annotations['kubernetes.io/ingress.global-static-ip-name']"}, nil
 	}
 
 	return nil, nil
 }
 
-func jsonPatch(ar *admission.AdmissionReview, violate error) ([]byte, error) {
+func jsonPatch(ar *admission.AdmissionReview, violate error) (map[string]interface{}, error) {
 	var respStr string
 
 	switch customErr := violate.(type) {
@@ -83,5 +93,5 @@ func jsonPatch(ar *admission.AdmissionReview, violate error) ([]byte, error) {
 		err = fmt.Errorf("JSON Unmarshal error: %s", err)
 		return nil, err
 	}
-	return []byte(respStr), nil
+	return jsonBody, nil
 }

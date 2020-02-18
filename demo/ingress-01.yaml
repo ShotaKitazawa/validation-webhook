@@ -1,0 +1,20 @@
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: demo-ingress
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: "demo-gip-01"
+spec:
+  backend:
+    serviceName: demo-svc
+    servicePort: 80
+  rules:
+    - host: demo.local
+      http:
+        paths:
+          - backend:
+              serviceName: demo-svc
+              servicePort: 80
+
