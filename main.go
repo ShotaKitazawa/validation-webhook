@@ -48,7 +48,6 @@ func validation(ar *admission.AdmissionReview) (violate error, err error) {
 		return nil, err
 	}
 
-	// TODO: read from config_file
 	lines, err := readfile.Read(cfg.policyFile)
 
 	// TODO: evaluate multiple `path`
