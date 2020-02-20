@@ -21,14 +21,21 @@ spec:
           args:
             - -tls-cert-file=/etc/webhook/certs/cert.pem
             - -tls-key-file=/etc/webhook/certs/key.pem
+            - -policy-file=/etc/webhook/policy/policy.conf
           volumeMounts:
             - name: webhook-certs
               mountPath: /etc/webhook/certs
+              readOnly: true
+            - name: webhook-policy
+              mountPath: /etc/webhook/policy
               readOnly: true
       volumes:
         - name: webhook-certs
           secret:
             secretName: immutable-checker.default.svc
+        - name: webhook-policy
+          configMap:
+            name: immutable-checker.default.svc
 ---
 apiVersion: v1
 kind: Service

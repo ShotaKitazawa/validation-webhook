@@ -18,10 +18,13 @@ import (
 
 	"github.com/ShotaKitazawa/validation-webhook/pkg/errors"
 	"github.com/ShotaKitazawa/validation-webhook/pkg/jsonpatch"
+	"github.com/ShotaKitazawa/validation-webhook/pkg/readfile"
 	"github.com/ShotaKitazawa/validation-webhook/pkg/search"
 )
 
 var (
+	cfg *config
+
 	scheme = runtime.NewScheme()
 	codecs = serializer.NewCodecFactory(scheme)
 )
@@ -46,10 +49,12 @@ func validation(ar *admission.AdmissionReview) (violate error, err error) {
 	}
 
 	// TODO: read from config_file
-	path := `ingress.metadata.annotations["kubernetes.io/ingress.global-static-ip-name"]`
+	lines, err := readfile.Read(cfg.policyFile)
 
 	// TODO: evaluate multiple `path`
 	// TODO: concurrency evaluate
+	path := lines[0]
+
 	escapedPath, err := search.Escape(path)
 	if err != nil {
 		return nil, nil
@@ -105,8 +110,9 @@ func Handler(c echo.Context) error {
 }
 
 type config struct {
-	certFile string
-	keyFile  string
+	certFile   string
+	keyFile    string
+	policyFile string
 }
 
 func initFlags() *config {
@@ -115,15 +121,21 @@ func initFlags() *config {
 	fl := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fl.StringVar(&cfg.certFile, "tls-cert-file", "", "TLS certificate file")
 	fl.StringVar(&cfg.keyFile, "tls-key-file", "", "TLS key file")
-
+	fl.StringVar(&cfg.policyFile, "policy-file", "", "Policy file")
 	fl.Parse(os.Args[1:])
+
+	if cfg.certFile == "" || cfg.keyFile == "" || cfg.policyFile == "" {
+		fmt.Println("not enough required fields")
+		os.Exit(2)
+	}
+
 	return cfg
 }
 
 func main() {
 
 	// Initialize
-	cfg := initFlags()
+	cfg = initFlags()
 	e := echo.New()
 
 	// Middleware
